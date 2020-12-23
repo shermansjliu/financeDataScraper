@@ -1,18 +1,18 @@
-import xlrd
+from openpyxl import Workbook, load_workbook
 from selenium import webdriver
-financials_url = 'https://www.wsj.com/market-data/quotes/HK/XHKG/1810/financials'
-browser = webdriver.Chrome()
 
-workbook = xlrd.open_workbook('./')
+# financials_url = 'https://www.wsj.com/market-data/quotes/HK/XHKG/1810/financials'
+PATH = "C:\chromedriver.exe"
 
-worksheet = workbook.sheet_by_index(0)
-first_row = [] # The row where we stock the name of the column
-for col in range(worksheet.ncols):
-    first_row.append( worksheet.cell_value(0,col) )
-# tronsform the workbook to a list of dictionnary
-data =[]
-for row in range(1, worksheet.nrows):
-    elm = {}
-    for col in range(worksheet.ncols):
-        elm[first_row[col]]=worksheet.cell_value(row,col)
-    data.append(elm)
+# wb = Workbook()
+wb = load_workbook(filename="copy_hk_stock.xlsx")
+# print(wb.sheetnames)
+sheet = wb.active
+sheet["B1"] = "Hello"
+
+browser = webdriver.Chrome(PATH)
+
+# sheet = workbook.active
+
+#Take categories and iterate over them. 
+wb.save(filename="copy_hk_stock.xlsx")
