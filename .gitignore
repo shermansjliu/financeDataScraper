@@ -2,3 +2,4 @@
 venv
 chromedriver.exe
 .vscode
+debug.log
