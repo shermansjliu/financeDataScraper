@@ -131,19 +131,4 @@ def extract_balance_sheet_data(self, company_code):
     self.extract_income_statement_page()
 
 
-    
-    #Narrow down list using .contains
-    #Split list into billions and decimals 
-    #apply regex
-    #Check for B
-    #standerdize values 
-
-
-    #TODO Create a separate way to extract Total Current Assets
-    #REGEx for getting digits 
-
-
-      
-    
-
 
