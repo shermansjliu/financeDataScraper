@@ -11,12 +11,13 @@ from Info import Info
 
 
 class FinanceBot:
-    def __init__(self, workbook_name):
+    def __init__(self, workbook_name, starting_col):
         self.driver = webdriver.Chrome("C:\chromedriver")
         self.info = {info.value: 0. for info in Info}
         self.wait = WebDriverWait(self.driver, 10)
         self.wb = load_workbook(filename=f"{workbook_name}.xlsx", data_only=True)
         self.wb_name = workbook_name
+        self.starting_column = starting_col
         # TODO initialize new worksheet
         self.font = Font(b=False, size=11)
 
@@ -26,10 +27,10 @@ class FinanceBot:
         column_names.sort()
 
         # Clear instruction columns
-        sheet.delete_cols(3, 4)
-
+        sheet.delete_cols(self.starting_column, len(self.info)+self.starting_column)
         # First two rows are company ids
-        col_i = 3
+        col_i = self.starting_column
+
         for name in column_names:
             header_cell = sheet.cell(row=1, column=col_i)
             header_cell.value = name
@@ -77,8 +78,7 @@ class FinanceBot:
             return 0.
 
         # Remove comma b/c Python cannot convert float of string numbers with commas e.g ("100,000")
-        elmt_text = elmt.text.replace("(", "").replace(")", "")
-        elmt_text = elmt.text.replace(",", "")
+        elmt_text = elmt.text.replace("(", "").replace(")", "").replace(",", "")
 
         return float(elmt_text)
 
@@ -88,7 +88,7 @@ class FinanceBot:
             f"https://www.wsj.com/market-data/quotes/HK/XHKG/{company_code}/financials/annual/balance-sheet")
 
         try:
-            cash = self.get_latest_cell_value(Info.CASH.value)
+            cash = self.get_latest_cell_value(Info.CASH_ST_INVESTMENTS.value)
             total_current_assets = self.get_latest_cell_value(Info.TCA.value)
 
             # Expand Liabilities & Shareholders' Equity Section
@@ -137,12 +137,12 @@ class FinanceBot:
         sheet = self.wb.active
         # Save info to excel sheet
         # For a particular company
-        company_row = 7
+        company_row = 2
 
         for i in range(10):
             company_id = int(sheet.cell(row=company_row, column=1).value)
             self.extract_finance_data_from_company(company_id)
-            for col in range(3, 3 + len(self.info)):
+            for col in range(self.starting_column, self.starting_column + len(self.info)):
                 col_name = sheet.cell(row=1, column=col).value
                 cell = sheet.cell(row=company_row, column=col)
                 # print(f"{cell.column_letter}:{company_row}, {col_name}: {self.info[col_name]}")
