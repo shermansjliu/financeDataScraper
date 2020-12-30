@@ -41,9 +41,6 @@ class FinanceBot:
         # Take categories and iterate over them.
         self.wb.save(filename=f"{self.wb_name}.xlsx")
 
-        financials_url = (
-            "https://www.wsj.com/market-data/quotes/HK/XHKG/1810/financials"
-        )
         # PATH = "/Users/work/Documents/projects/chromedriver"
 
     def extract_income_statement_page(self, company_code):
@@ -76,11 +73,12 @@ class FinanceBot:
                 )
             )
             ebit = float(ebit_element.text)
+            self.info["Sales/Revenue"] = sales_revenue
+            self.info["EBIT"] = ebit
         except:
-            self.driver.quit()
+            pass
 
-        self.info["Sales/Revenue"] = sales_revenue
-        self.info["EBIT"] = float(ebit)
+
 
     def get_latest_cell(self, row_name) -> float:
         elmt = self.driver.find_element_by_xpath(
@@ -89,9 +87,8 @@ class FinanceBot:
         return float(elmt.text)
 
     def extract_balance_sheet_page(self, company_code):
-        self.driver.get(
-            f"https://www.wsj.com/market-data/quotes/HK/XHKG/{company_code}/financials/annual/balance-sheet"
-        )
+
+        self.driver.get(f"https://www.wsj.com/market-data/quotes/HK/XHKG/{company_code}/financials/annual/balance-sheet")
 
         try:
             cash_element = self.wait.until(
@@ -145,8 +142,7 @@ class FinanceBot:
             self.info["Total Current Liabilities"] = toatl_curr_liabilites
             self.info["Net Property, Plant & Equipment"] = net_property_and_plan_equipment
         except:
-            self.driver.quit()
-
+            pass
     def extract_finance_data_from_company(self, company_code):
         self.driver.get(
             f"https://www.wsj.com/market-data/quotes/HK/XHKG/{company_code}/financials"
@@ -161,17 +157,16 @@ class FinanceBot:
         entrprse_value_to_sales_elmt = self.wait.until(EC.presence_of_element_located(
             (By.XPATH, "//span[text()='Enterprise Value to Sales']/following-sibling::span[1]/span")
             ))
-        # "/html/body/div[3]/section[2]/div[2]/div[1]/div[3]/div/div[2]/div[1]/div[1]/table/tbody/tr[7]/td/span[2]/span"
-        # "/html/body/div[2]/section[2]/div[2]/div[1]/div[3]/div/div[2]/div[1]/div[1]/table/tbody/tr[7]/td/span[2]/span"
         entrprse_value_to_sales = float(entrprse_value_to_sales_elmt.text)
-        self.info["Enterprise Value To Sales"] = entrprse_value_to_sales
+        print(entrprse_value_to_sales)
+        self.info["Enterprise Value to Sales"] = entrprse_value_to_sales
+        print(self.info)
 
-        # Visit  income statement page
+        #Visit Income Statement
         self.extract_income_statement_page(company_code)
-        self.driver.get(
-            f"https://www.wsj.com/market-data/quotes/HK/XHKG/{company_code}/financials"
-        )
+        #Visite Balane Sheet Page
         self.extract_balance_sheet_page(company_code)
+
 
     def extract_finance_data(self) -> None:
         sheet = self.wb.active
@@ -180,7 +175,7 @@ class FinanceBot:
         company_row = 2
         self.extract_finance_data_from_company(1)
         for col in range(2, len(self.info.keys())):
-            col_name = sheet.cell(row=1, column=col)
+            col_name = sheet.cell(row=1, column=col).value
             print(f"{col_name}", self.info.get(col_name))
             # sheet.cell(row=company_row, column=col) = self.info[col_name]
         self.wb.save(filename=f"{self.wb_name}.xlsx")

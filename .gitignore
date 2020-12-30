@@ -3,3 +3,4 @@ venv
 chromedriver.exe
 .vscode
 debug.log
+ __pycache__
