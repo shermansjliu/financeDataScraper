@@ -2,7 +2,8 @@ from FinanceBot import FinanceBot
 
 
 def main():
-    finance_bot = FinanceBot("copy_hk_stock")
+    finance_bot = FinanceBot("HK-Stock-Analysis - Copy")
+    finance_bot.initialize_worksheet()
     finance_bot.extract_finance_data()
 
 

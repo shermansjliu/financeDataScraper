@@ -1,41 +1,45 @@
-from openpyxl import Workbook, load_workbook
+from openpyxl import load_workbook
+from openpyxl.styles import Font, Alignment
 from selenium import webdriver
+from typing import Union
 from time import sleep
-import re
+
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from Info import Info
 
 
 class FinanceBot:
     def __init__(self, workbook_name):
         self.driver = webdriver.Chrome("C:\chromedriver")
-        self.info = {
-            "Enterprise Value to Sales": 0.,
-            "EBIT": 0.,
-            "Sales/Revenue": 0.,
-            "Cash": 0.,
-            "Total Current Assets": 0.,
-            "Short Term Debt": 0.,
-            "Current Portion of Long Term Debt": 0.,
-            "Total Current Liabilities": 0.,
-            "Net Property, Plant & Equipment": 0.,
-        }
+        self.info = {info.value: 0. for info in Info}
         self.wait = WebDriverWait(self.driver, 10)
-        self.wb = load_workbook(filename=f"{workbook_name}.xlsx")
+        self.wb = load_workbook(filename=f"{workbook_name}.xlsx", data_only=True)
         self.wb_name = workbook_name
+        # TODO initialize new worksheet
+        self.font = Font(b=False, size=11)
 
-    def format_worksheet(self):
+    def initialize_worksheet(self):
         sheet = self.wb.active
+        column_names = list(self.info.keys())
+        column_names.sort()
+
         # Clear instruction columns
         sheet.delete_cols(3, 4)
 
-        # Populate column names
-        column_names = list(self.info.keys())
-        column_names.sort()
+        # First two rows are company ids
         col_i = 3
         for name in column_names:
-            sheet.cell(row=1, column=col_i).value = name
+            header_cell = sheet.cell(row=1, column=col_i)
+            header_cell.value = name
+            header_cell.font = self.font
+            if name == Info.COMPANY_NAME.value:
+                sheet.column_dimensions[header_cell.column_letter].width = 40
+            elif name == Info.EBIT.value:
+                sheet.column_dimensions[header_cell.column_letter].width = 30
+            else:
+                sheet.column_dimensions[header_cell.column_letter].width = len(name) * 1.2
             col_i += 1
 
         # Take categories and iterate over them.
@@ -43,107 +47,70 @@ class FinanceBot:
 
         # PATH = "/Users/work/Documents/projects/chromedriver"
 
-    def extract_income_statement_page(self, company_code):
+    def extract_income_statement_page(self, company_code: int) -> None:
         """
         Extracts pertinent data from the income statement page
         """
         self.driver.get(
             f"https://www.wsj.com/market-data/quotes/HK/XHKG/{company_code}/financials/annual/income-statement"
         )
-        # get sales/revenue and EBIT
-        sales_revenue = 0
-        ebit = 0
-        try:
-            sales_rev_element = self.wait.until(
-                EC.presence_of_element_located(
-                    (
-                        By.XPATH,
-                        '//*[@id="cr_cashflow"]/div[2]/div/table/tbody/tr[1]/td[2]',
-                    )
-                )
-            )
-            sales_revenue = float(sales_rev_element.text)
-            #
-            ebit_element = self.wait.until(
-                EC.presence_of_element_located(
-                    (
-                        By.XPATH,
-                        '//*[@id="cr_cashflow"]/div[2]/div/table/tbody/tr[1]/td[2]',
-                    )
-                )
-            )
-            ebit = float(ebit_element.text)
-            self.info["Sales/Revenue"] = sales_revenue
-            self.info["EBIT"] = ebit
-        except:
-            pass
+        sales_revenue = self.get_latest_cell_value(Info.S_R.value)
+        ebit = self.get_latest_cell_value(Info.EBIT.value)
+        self.info[Info.S_R.value] = sales_revenue
+        self.info[Info.EBIT.value] = ebit
 
+    def get_latest_cell_value(self, cell_name: str) -> Union[float, str]:
 
+        elmts = self.driver.find_elements_by_xpath(f"//td[text()='{cell_name}']/following-sibling::td[1]")
 
-    def get_latest_cell(self, row_name) -> float:
-        elmt = self.driver.find_element_by_xpath(
-            f"//td[text()='{row_name}']/following-sibling::td[1]"
-        )
-        return float(elmt.text)
+        # If doesn't exist or emtpy string return N/A
+        if not elmts:
+            return "N/A"
 
-    def extract_balance_sheet_page(self, company_code):
+        elmt = elmts[0]
 
-        self.driver.get(f"https://www.wsj.com/market-data/quotes/HK/XHKG/{company_code}/financials/annual/balance-sheet")
+        if elmt.text == "":
+            return "N/A"
+
+        # If text == dash return 0
+        elif elmt.text == "-":
+            return 0.
+
+        # Remove comma b/c Python cannot convert float of string numbers with commas e.g ("100,000")
+        elmt_text = elmt.text.replace("(", "").replace(")", "")
+        elmt_text = elmt.text.replace(",", "")
+
+        return float(elmt_text)
+
+    def extract_balance_sheet_page(self, company_code: int) -> None:
+
+        self.driver.get(
+            f"https://www.wsj.com/market-data/quotes/HK/XHKG/{company_code}/financials/annual/balance-sheet")
 
         try:
-            cash_element = self.wait.until(
-                EC.presence_of_element_located(
-                    (
-                        By.XPATH,
-                        '//*[@id="cr_cashflow"]/div[2]/div[2]/table/tbody/tr[2]/td[2]',
-                    )
-                )
-            )
-            cash = float(cash_element.text)
-
-            total_current_assets_element = self.wait.until(
-                EC.presence_of_element_located(
-                    (
-                        By.XPATH,
-                        '//*[@id="cr_cashflow"]/div[2]/div[2]/table/tbody/tr[22]/td[1]',
-                    )
-                )
-            )
-            total_current_assets = float(total_current_assets_element.text)
+            cash = self.get_latest_cell_value(Info.CASH.value)
+            total_current_assets = self.get_latest_cell_value(Info.TCA.value)
 
             # Expand Liabilities & Shareholders' Equity Section
-            liabilities_btn = self.driver.find_element_by_xpath(
-                '//*[@id="cr_cashflow"]/div[3]/div[1]'
-            )
+            liabilities_btn = self.driver.find_elements_by_xpath("//h2[contains(text(),Liabilities)]/parent::div")[1]
             liabilities_btn.click()
 
-            short_term_debt_element = self.driver.find_element_by_xpath(
-                "//td[text()='Short Term Debt']/following-sibling::td[1]"
-            )
-            short_term_debt = float(short_term_debt_element.text)
+            total_curr_liabilities = self.get_latest_cell_value(Info.TCL.value)
+            net_property_and_plan_equipment = self.get_latest_cell_value(Info.NETPPEQ.value)
 
-            lt_debt_elmt = self.driver.find_element_by_xpath(
-                "//td[text()='Current Portion of Long Term Debt']/following-sibling::td[1]"
-            )
-            lt_debt = float(lt_debt_elmt.text)
+            self.info[Info.LTDebt.value] = self.get_latest_cell_value(Info.LTDebt.value)
+            self.info[Info.CPLTDebt.value] = self.get_latest_cell_value(Info.CPLTDebt.value)
+            self.info[Info.STDebt.value] = self.get_latest_cell_value(Info.STDebt.value)
 
-            total_curr_liabilites_elmt = self.driver.find_element_by_xpath(
-                "//td[text()='Total Current Liabilities']/following-sibling::td[1]"
-            )
-            toatl_curr_liabilites = float(total_curr_liabilites_elmt.text)
+            self.info[Info.TCA.value] = total_current_assets
+            self.info[Info.CASH.value] = cash
+            self.info[Info.TCL.value] = total_curr_liabilities
+            self.info[Info.NETPPEQ.value] = net_property_and_plan_equipment
 
-            net_property_and_plan_equipment = self.get_latest_cell(
-                "Net Property, Plant & Equipment"
-            )
-            self.info["Total Current Assets"] = total_current_assets
-            self.info["Cash"] = cash
-            self.info["Short Term Debt"] = short_term_debt
-            self.info["Current Portion of Long Term Debt"] = lt_debt
-            self.info["Total Current Liabilities"] = toatl_curr_liabilites
-            self.info["Net Property, Plant & Equipment"] = net_property_and_plan_equipment
         except:
-            pass
-    def extract_finance_data_from_company(self, company_code):
+            self.driver.quit()
+
+    def extract_finance_data_from_company(self, company_code: int) -> None:
         self.driver.get(
             f"https://www.wsj.com/market-data/quotes/HK/XHKG/{company_code}/financials"
         )
@@ -152,30 +119,37 @@ class FinanceBot:
         company_name = company_name[
                        : len(company_name) - 2
                        ]  # Remove Full stop and white space from title
-
+        self.info[Info.COMPANY_NAME.value] = company_name
         # Extract data from financials page
         entrprse_value_to_sales_elmt = self.wait.until(EC.presence_of_element_located(
             (By.XPATH, "//span[text()='Enterprise Value to Sales']/following-sibling::span[1]/span")
-            ))
+        ))
         entrprse_value_to_sales = float(entrprse_value_to_sales_elmt.text)
-        print(entrprse_value_to_sales)
-        self.info["Enterprise Value to Sales"] = entrprse_value_to_sales
-        print(self.info)
+        self.info[Info.EVTS.value] = entrprse_value_to_sales
 
-        #Visit Income Statement
+        # Visit Income Statement
         self.extract_income_statement_page(company_code)
-        #Visite Balane Sheet Page
-        self.extract_balance_sheet_page(company_code)
 
+        # Visit Balance Sheet Page
+        self.extract_balance_sheet_page(company_code)
 
     def extract_finance_data(self) -> None:
         sheet = self.wb.active
         # Save info to excel sheet
         # For a particular company
-        company_row = 2
-        self.extract_finance_data_from_company(1)
-        for col in range(2, len(self.info.keys())):
-            col_name = sheet.cell(row=1, column=col).value
-            print(f"{col_name}", self.info.get(col_name))
-            # sheet.cell(row=company_row, column=col) = self.info[col_name]
-        self.wb.save(filename=f"{self.wb_name}.xlsx")
+        company_row = 7
+
+        for i in range(10):
+            company_id = int(sheet.cell(row=company_row, column=1).value)
+            self.extract_finance_data_from_company(company_id)
+            for col in range(3, 3 + len(self.info)):
+                col_name = sheet.cell(row=1, column=col).value
+                cell = sheet.cell(row=company_row, column=col)
+                # print(f"{cell.column_letter}:{company_row}, {col_name}: {self.info[col_name]}")
+                cell.font = self.font
+                cell.alignment = Alignment(horizontal="left")
+                cell.value = self.info[col_name]
+            company_row += 1
+            self.wb.save(filename=f"{self.wb_name}.xlsx")
+        # self.wb.save(filename=f"{self.wb_name}.xlsx")
+        self.driver.quit()
