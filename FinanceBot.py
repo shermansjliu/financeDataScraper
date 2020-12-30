@@ -15,7 +15,7 @@ class FinanceBot:
         self.driver = webdriver.Chrome("C:\chromedriver")
         self.info = {info.value: 0. for info in Info}
         self.wait = WebDriverWait(self.driver, 10)
-        self.wb = load_workbook(filename=f"{workbook_name}.xlsx", data_only=True)
+        self.wb = load_workbook(filename=f"{workbook_name}.xlsx")
         self.wb_name = workbook_name
         self.starting_column = starting_col
         # TODO initialize new worksheet
@@ -63,23 +63,25 @@ class FinanceBot:
     def get_latest_cell_value(self, cell_name: str) -> Union[float, str]:
 
         elmts = self.driver.find_elements_by_xpath(f"//td[text()='{cell_name}']/following-sibling::td[1]")
-
         # If doesn't exist or emtpy string return N/A
         if not elmts:
+            # print(f"{cell_name}: N/A")
             return "N/A"
 
         elmt = elmts[0]
 
         if elmt.text == "":
+            # print(f"{cell_name}: N/A")
             return "N/A"
 
         # If text == dash return 0
         elif elmt.text == "-":
+            # print(f"{cell_name}: 0")
             return 0.
 
         # Remove comma b/c Python cannot convert float of string numbers with commas e.g ("100,000")
         elmt_text = elmt.text.replace("(", "").replace(")", "").replace(",", "")
-
+        # print(f"{cell_name}: {elmt_text}")
         return float(elmt_text)
 
     def extract_balance_sheet_page(self, company_code: int) -> None:
@@ -87,30 +89,26 @@ class FinanceBot:
         self.driver.get(
             f"https://www.wsj.com/market-data/quotes/HK/XHKG/{company_code}/financials/annual/balance-sheet")
 
-        try:
-            cash = self.get_latest_cell_value(Info.CASH_ST_INVESTMENTS.value)
-            total_current_assets = self.get_latest_cell_value(Info.TCA.value)
 
-            # Expand Liabilities & Shareholders' Equity Section
-            liabilities_btn = self.driver.find_elements_by_xpath("//h2[contains(text(),Liabilities)]/parent::div")[1]
-            liabilities_btn.click()
+        self.info[Info.CASH_ST_INVESTMENTS.value] = self.get_latest_cell_value(Info.CASH_ST_INVESTMENTS.value)
+        self.info[Info.TCA.value]= self.get_latest_cell_value(Info.TCA.value)
 
-            total_curr_liabilities = self.get_latest_cell_value(Info.TCL.value)
-            net_property_and_plan_equipment = self.get_latest_cell_value(Info.NETPPEQ.value)
 
-            self.info[Info.LTDebt.value] = self.get_latest_cell_value(Info.LTDebt.value)
-            self.info[Info.CPLTDebt.value] = self.get_latest_cell_value(Info.CPLTDebt.value)
-            self.info[Info.STDebt.value] = self.get_latest_cell_value(Info.STDebt.value)
+        # Expand Liabilities & Shareholders' Equity Section
+        liabilities_btn = self.driver.find_elements_by_xpath("//h2[contains(text(),Liabilities)]/parent::div")[1]
+        liabilities_btn.click()
 
-            self.info[Info.TCA.value] = total_current_assets
-            self.info[Info.CASH.value] = cash
-            self.info[Info.TCL.value] = total_curr_liabilities
-            self.info[Info.NETPPEQ.value] = net_property_and_plan_equipment
+        self.info[Info.TOTDebt.value] = self.get_latest_cell_value(Info.TOTDebt.value)
+        self.info[Info.LTDebt.value] = self.get_latest_cell_value(Info.LTDebt.value)
+        self.info[Info.CPLTDebt.value] = self.get_latest_cell_value(Info.CPLTDebt.value)
+        self.info[Info.STDebt.value] = self.get_latest_cell_value(Info.STDebt.value)
+        self.info[Info.NETPPEQ.value]= self.get_latest_cell_value(Info.NETPPEQ.value)
+        self.info[Info.TCL.value] = self.get_latest_cell_value(Info.TCL.value)
 
-        except:
-            self.driver.quit()
+
 
     def extract_finance_data_from_company(self, company_code: int) -> None:
+
         self.driver.get(
             f"https://www.wsj.com/market-data/quotes/HK/XHKG/{company_code}/financials"
         )
@@ -124,6 +122,7 @@ class FinanceBot:
         entrprse_value_to_sales_elmt = self.wait.until(EC.presence_of_element_located(
             (By.XPATH, "//span[text()='Enterprise Value to Sales']/following-sibling::span[1]/span")
         ))
+        print("Enterprise values to sales", entrprse_value_to_sales_elmt.text)
         entrprse_value_to_sales = float(entrprse_value_to_sales_elmt.text)
         self.info[Info.EVTS.value] = entrprse_value_to_sales
 
@@ -139,7 +138,7 @@ class FinanceBot:
         # For a particular company
         company_row = 2
 
-        for i in range(10):
+        while sheet.cell(row=company_row, column=1).value is not None:
             company_id = int(sheet.cell(row=company_row, column=1).value)
             self.extract_finance_data_from_company(company_id)
             for col in range(self.starting_column, self.starting_column + len(self.info)):
@@ -151,5 +150,5 @@ class FinanceBot:
                 cell.value = self.info[col_name]
             company_row += 1
             self.wb.save(filename=f"{self.wb_name}.xlsx")
-        # self.wb.save(filename=f"{self.wb_name}.xlsx")
+    # self.wb.save(filename=f"{self.wb_name}.xlsx")
         self.driver.quit()
