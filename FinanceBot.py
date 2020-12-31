@@ -27,7 +27,7 @@ class FinanceBot:
         column_names.sort()
 
         # Clear instruction columns
-        sheet.delete_cols(self.starting_column, len(self.info)+self.starting_column)
+        sheet.delete_cols(self.starting_column, len(self.info) + self.starting_column)
         # First two rows are company ids
         col_i = self.starting_column
 
@@ -89,10 +89,8 @@ class FinanceBot:
         self.driver.get(
             f"https://www.wsj.com/market-data/quotes/HK/XHKG/{company_code}/financials/annual/balance-sheet")
 
-
         self.info[Info.CASH_ST_INVESTMENTS.value] = self.get_latest_cell_value(Info.CASH_ST_INVESTMENTS.value)
-        self.info[Info.TCA.value]= self.get_latest_cell_value(Info.TCA.value)
-
+        self.info[Info.TCA.value] = self.get_latest_cell_value(Info.TCA.value)
 
         # Expand Liabilities & Shareholders' Equity Section
         liabilities_btn = self.driver.find_elements_by_xpath("//h2[contains(text(),Liabilities)]/parent::div")[1]
@@ -102,10 +100,8 @@ class FinanceBot:
         self.info[Info.LTDebt.value] = self.get_latest_cell_value(Info.LTDebt.value)
         self.info[Info.CPLTDebt.value] = self.get_latest_cell_value(Info.CPLTDebt.value)
         self.info[Info.STDebt.value] = self.get_latest_cell_value(Info.STDebt.value)
-        self.info[Info.NETPPEQ.value]= self.get_latest_cell_value(Info.NETPPEQ.value)
+        self.info[Info.NETPPEQ.value] = self.get_latest_cell_value(Info.NETPPEQ.value)
         self.info[Info.TCL.value] = self.get_latest_cell_value(Info.TCL.value)
-
-
 
     def extract_finance_data_from_company(self, company_code: int) -> None:
 
@@ -119,12 +115,14 @@ class FinanceBot:
                        ]  # Remove Full stop and white space from title
         self.info[Info.COMPANY_NAME.value] = company_name
         # Extract data from financials page
-        entrprse_value_to_sales_elmt = self.wait.until(EC.presence_of_element_located(
-            (By.XPATH, "//span[text()='Enterprise Value to Sales']/following-sibling::span[1]/span")
-        ))
-        print("Enterprise values to sales", entrprse_value_to_sales_elmt.text)
-        entrprse_value_to_sales = float(entrprse_value_to_sales_elmt.text)
-        self.info[Info.EVTS.value] = entrprse_value_to_sales
+        entrprse_value_to_sales_elmts = self.driver.find_elements_by_xpath(
+            "//span[text()='Enterprise Value to Sales']/following-sibling::span[1]/span")
+        if not entrprse_value_to_sales_elmts == "" or entrprse_value_to_sales_elmts[0] == "":
+            self.info[Info.EVTS.value] = "N/A"
+        elif entrprse_value_to_sales_elmts[0] == "-":
+            self.info[Info.EVTS.value] = 0.
+        else:
+            self.info[Info.EVTS.value] = float(entrprse_value_to_sales_elmts[0].text)
 
         # Visit Income Statement
         self.extract_income_statement_page(company_code)
@@ -150,5 +148,5 @@ class FinanceBot:
                 cell.value = self.info[col_name]
             company_row += 1
             self.wb.save(filename=f"{self.wb_name}.xlsx")
-    # self.wb.save(filename=f"{self.wb_name}.xlsx")
+        # self.wb.save(filename=f"{self.wb_name}.xlsx")
         self.driver.quit()
