@@ -11,13 +11,14 @@ from Info import Info
 
 
 class FinanceBot:
-    def __init__(self, workbook_name, starting_col):
+    def __init__(self, workbook_name, start_col, start_row):
         self.driver = webdriver.Chrome("C:\chromedriver")
         self.info = {info.value: 0. for info in Info}
         self.wait = WebDriverWait(self.driver, 10)
         self.wb = load_workbook(filename=f"{workbook_name}.xlsx")
         self.wb_name = workbook_name
-        self.starting_column = starting_col
+        self.start_col = start_col
+        self.start_row = start_row
         # TODO initialize new worksheet
         self.font = Font(b=False, size=11)
 
@@ -93,8 +94,9 @@ class FinanceBot:
         self.info[Info.TCA.value] = self.get_latest_cell_value(Info.TCA.value)
 
         # Expand Liabilities & Shareholders' Equity Section
-        liabilities_btn = self.driver.find_elements_by_xpath("//h2[contains(text(),Liabilities)]/parent::div")[1]
-        liabilities_btn.click()
+        liabilities_btn = self.driver.find_elements_by_xpath("//h2[contains(text(),Liabilities)]/parent::div")
+        if liabilities_btn:
+            liabilities_btn[1].click()
 
         self.info[Info.TOTDebt.value] = self.get_latest_cell_value(Info.TOTDebt.value)
         self.info[Info.LTDebt.value] = self.get_latest_cell_value(Info.LTDebt.value)
@@ -103,11 +105,23 @@ class FinanceBot:
         self.info[Info.NETPPEQ.value] = self.get_latest_cell_value(Info.NETPPEQ.value)
         self.info[Info.TCL.value] = self.get_latest_cell_value(Info.TCL.value)
 
+    def page_not_found(self)->bool:
+        pg_not_found_elmt = self.driver.find_elements_by_xpath("//span[text()='Page Not Found']")
+        if len(pg_not_found_elmt) > 0:
+            return True
+        else:
+            return False
+
     def extract_finance_data_from_company(self, company_code: int) -> None:
 
         self.driver.get(
             f"https://www.wsj.com/market-data/quotes/HK/XHKG/{company_code}/financials"
         )
+
+        if self.page_not_found():
+            for key in self.info:
+                self.info[key] = "N/A"
+            return
 
         company_name = self.driver.find_element_by_class_name("companyName").text
         company_name = company_name[
@@ -132,19 +146,19 @@ class FinanceBot:
 
     def extract_finance_data(self) -> None:
         sheet = self.wb.active
-        # Save info to excel sheet
-        # For a particular company
-        company_row = 2
+
+        company_row = self.start_row
 
         while sheet.cell(row=company_row, column=1).value is not None:
             company_id = int(sheet.cell(row=company_row, column=1).value)
             self.extract_finance_data_from_company(company_id)
-            for col in range(self.starting_column, self.starting_column + len(self.info)):
+            for col in range(self.start_col, self.start_col + len(self.info)):
                 col_name = sheet.cell(row=1, column=col).value
                 cell = sheet.cell(row=company_row, column=col)
-                # print(f"{cell.column_letter}:{company_row}, {col_name}: {self.info[col_name]}")
+                # print(f"{cell.column_letter}:{company_row}, {col_name}: {self.info.get(col_name)}")
                 cell.font = self.font
                 cell.alignment = Alignment(horizontal="left")
+                # print(f"f{col_name}, ")
                 cell.value = self.info[col_name]
             company_row += 1
             self.wb.save(filename=f"{self.wb_name}.xlsx")
