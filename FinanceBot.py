@@ -2,11 +2,8 @@ from openpyxl import load_workbook
 from openpyxl.styles import Font, Alignment
 from selenium import webdriver
 from typing import Union
-from time import sleep
 
-from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
 from Info import Info
 
 
