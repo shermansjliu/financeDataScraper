@@ -3,7 +3,7 @@ from FinanceBot import FinanceBot
 
 def main():
     #Filename, start_row, start_col
-    finance_bot = FinanceBot("HK-Stock-Analysis - Copy", 2, 2)
+    finance_bot = FinanceBot("HK-Stock-Analysis - Copy", 56, 2)
     # finance_bot.initialize_worksheet()
     finance_bot.extract_finance_data()
 

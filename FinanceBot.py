@@ -128,7 +128,7 @@ class FinanceBot:
         # Extract data from financials page
         entrprse_value_to_sales_elmts = self.driver.find_elements_by_xpath(
             "//span[text()='Enterprise Value to Sales']/following-sibling::span[1]/span")
-        if not entrprse_value_to_sales_elmts == "" or entrprse_value_to_sales_elmts[0] == "":
+        if not entrprse_value_to_sales_elmts == [] or entrprse_value_to_sales_elmts[0].text == "":
             self.info[Info.EVTS.value] = "N/A"
         elif entrprse_value_to_sales_elmts[0] == "-":
             self.info[Info.EVTS.value] = 0.
