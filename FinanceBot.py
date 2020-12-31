@@ -8,7 +8,7 @@ from Info import Info
 
 
 class FinanceBot:
-    def __init__(self, workbook_name, start_col, start_row):
+    def __init__(self, workbook_name, start_row, start_col):
         self.driver = webdriver.Chrome("C:\chromedriver")
         self.info = {info.value: 0. for info in Info}
         self.wait = WebDriverWait(self.driver, 10)
